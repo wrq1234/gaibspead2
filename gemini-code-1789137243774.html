@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GAIB Spread Monitor | Bitget ↔ Kraken Arbitrage</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dark-theme">
+
+  <!-- Header -->
+  <header class="top-bar">
+    <div class="logo-title">
+      <h1>GAIB SPREAD MONITOR</h1>
+      <span class="subtitle">Bitget Spot ↔ Kraken Spot</span>
+    </div>
+    <div class="system-status">
+      <div id="connectionStatus" class="status-badge offline">🔴 OFFLINE</div>
+      <div class="status-details">
+        <span>Latency: <strong id="apiLatency">-- ms</strong></span>
+        <span>Updated: <strong id="lastUpdate">--:--:--</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Banner for Data Warning / Demo mode if pair isn't active -->
+  <div id="dataNotice" class="data-notice hidden">
+    ⚠️ <span id="noticeText">Data warning active</span>
+  </div>
+
+  <main class="dashboard-grid">
+
+    <!-- Primary Exchanges Cards -->
+    <section class="exchange-cards-container">
+      <!-- Bitget Card -->
+      <div class="card exchange-card" id="bitgetCard">
+        <div class="card-header">
+          <h2>BITGET SPOT</h2>
+          <span class="pair-tag" id="bitgetPairTag">GAIB/USDT</span>
+        </div>
+        <div class="card-body">
+          <div class="price-row">
+            <span class="label">Bid:</span>
+            <span class="value bid" id="bitgetBid">$0.0000</span>
+          </div>
+          <div class="price-row">
+            <span class="label">Ask:</span>
+            <span class="value ask" id="bitgetAsk">$0.0000</span>
+          </div>
+          <div class="price-row">
+            <span class="label">Last:</span>
+            <span class="value" id="bitgetLast">$0.0000</span>
+          </div>
+          <div class="stats-row">
+            <div>24h Chg: <span id="bitget24hChg">0.00%</span></div>
+            <div>24h Vol: <span id="bitget24hVol">$0</span></div>
+          </div>
+          <div class="card-footer">
+            <small>Update: <span id="bitgetUpdateTime">--</span></small>
+            <a href="https://www.bitget.com/spot/GAIBUSDT" target="_blank" class="btn-exchange">OPEN BITGET</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kraken Card -->
+      <div class="card exchange-card" id="krakenCard">
+        <div class="card-header">
+          <h2>KRAKEN SPOT</h2>
+          <span class="pair-tag" id="krakenPairTag">GAIB/USD</span>
+        </div>
+        <div class="card-body">
+          <div class="price-row">
+            <span class="label">Bid:</span>
+            <span class="value bid" id="krakenBid">$0.0000</span>
+          </div>
+          <div class="price-row">
+            <span class="label">Ask:</span>
+            <span class="value ask" id="krakenAsk">$0.0000</span>
+          </div>
+          <div class="price-row">
+            <span class="label">Last:</span>
+            <span class="value" id="krakenLast">$0.0000</span>
+          </div>
+          <div class="stats-row">
+            <div>24h Chg: <span id="kraken24hChg">0.00%</span></div>
+            <div>24h Vol: <span id="kraken24hVol">$0</span></div>
+          </div>
+          <div class="card-footer">
+            <small>Update: <span id="krakenUpdateTime">--</span></small>
+            <a href="https://www.kraken.com/prices/gaib" target="_blank" class="btn-exchange">OPEN KRAKEN</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Central Arbitrage Calculator -->
+    <section class="card arbitrage-card">
+      <h2>ARBITRAGE OPPORTUNITY (GROSS SPREAD)</h2>
+      <div class="arbitrage-directions">
+        
+        <!-- Bitget -> Kraken -->
+        <div class="direction-box" id="dirBitgetToKraken">
+          <div class="direction-title">🟢 Bitget → Kraken</div>
+          <div class="direction-action">BUY Bitget @ Ask ➔ SELL Kraken @ Bid</div>
+          <div class="price-comparison">
+            <div>Buy: <span id="b2kBuyPrice">$0.0000</span></div>
+            <div>Sell: <span id="b2kSellPrice">$0.0000</span></div>
+          </div>
+          <div class="spread-display">
+            <span class="spread-value" id="b2kGrossSpread">0.00%</span>
+            <span class="spread-diff" id="b2kAbsDiff">+$0.0000</span>
+          </div>
+        </div>
+
+        <!-- Kraken -> Bitget -->
+        <div class="direction-box" id="dirKrakenToBitget">
+          <div class="direction-title">🔵 Kraken → Bitget</div>
+          <div class="direction-action">BUY Kraken @ Ask ➔ SELL Bitget @ Bid</div>
+          <div class="price-comparison">
+            <div>Buy: <span id="k2bBuyPrice">$0.0000</span></div>
+            <div>Sell: <span id="k2bSellPrice">$0.0000</span></div>
+          </div>
+          <div class="spread-display">
+            <span class="spread-value" id="k2bGrossSpread">0.00%</span>
+            <span class="spread-diff" id="k2bAbsDiff">+$0.0000</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Settings, Liquidity & Net Spread Calculation -->
+    <section class="two-column-grid">
+      
+      <!-- Fees & Slippage Settings -->
+      <div class="card settings-card">
+        <h3>FEES & SLIPPAGE SETTINGS</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="inputBitgetFee">Bitget Trading Fee (%):</label>
+            <input type="number" id="inputBitgetFee" step="0.01" value="0.10">
+          </div>
+          <div class="form-group">
+            <label for="inputKrakenFee">Kraken Trading Fee (%):</label>
+            <input type="number" id="inputKrakenFee" step="0.01" value="0.25">
+          </div>
+          <div class="form-group">
+            <label for="inputSlippage">Estimated Slippage (%):</label>
+            <input type="number" id="inputSlippage" step="0.01" value="0.05">
+          </div>
+          <div class="form-group">
+            <label for="inputNetworkCost">Withdrawal / Network ($):</label>
+            <input type="number" id="inputNetworkCost" step="0.1" value="1.50">
+          </div>
+        </div>
+
+        <!-- Order Book Liquidity Trade Size -->
+        <div class="liquidity-selector">
+          <label for="selectTradeSize">Trade Size (VWAP Liquidity):</label>
+          <select id="selectTradeSize">
+            <option value="100">$100</option>
+            <option value="500">$500</option>
+            <option value="1000">$1,000</option>
+            <option value="5000">$5,000</option>
+            <option value="10000">$10,000</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Net Profit Projections Table -->
+      <div class="card profit-table-card">
+        <h3>ESTIMATED NET PROFIT PROJECTIONS</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Investment</th>
+                <th>Direction</th>
+                <th>Gross Profit</th>
+                <th>Est. Net Profit</th>
+              </tr>
+            </thead>
+            <tbody id="netProfitTableBody">
+              <!-- Populated dynamically via app.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Order Books Section -->
+    <section class="card orderbooks-card">
+      <h3>ORDER BOOKS (DEPTH)</h3>
+      <div class="orderbooks-grid">
+        
+        <!-- Bitget Orderbook -->
+        <div class="ob-column">
+          <h4>BITGET SPOT</h4>
+          <div class="ob-tables">
+            <table class="ob-table asks">
+              <caption>ASKS (Sell)</caption>
+              <thead><tr><th>Price</th><th>Amount</th></tr></thead>
+              <tbody id="bitgetAsksBody"></tbody>
+            </table>
+            <table class="ob-table bids">
+              <caption>BIDS (Buy)</caption>
+              <thead><tr><th>Price</th><th>Amount</th></tr></thead>
+              <tbody id="bitgetBidsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Kraken Orderbook -->
+        <div class="ob-column">
+          <h4>KRAKEN SPOT</h4>
+          <div class="ob-tables">
+            <table class="ob-table asks">
+              <caption>ASKS (Sell)</caption>
+              <thead><tr><th>Price</th><th>Amount</th></tr></thead>
+              <tbody id="krakenAsksBody"></tbody>
+            </table>
+            <table class="ob-table bids">
+              <caption>BIDS (Buy)</caption>
+              <thead><tr><th>Price</th><th>Amount</th></tr></thead>
+              <tbody id="krakenBidsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Spread History Chart -->
+    <section class="card chart-card">
+      <div class="chart-header">
+        <h3>GAIB SPREAD HISTORY</h3>
+        <div class="timeframe-buttons">
+          <button class="btn-tf active" data-tf="1m">1m</button>
+          <button class="btn-tf" data-tf="5m">5m</button>
+          <button class="btn-tf" data-tf="15m">15m</button>
+          <button class="btn-tf" data-tf="1h">1h</button>
+          <button class="btn-tf" data-tf="24h">24h</button>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="spreadChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Historical Spread Data Table -->
+    <section class="card table-card">
+      <h3>RECENT SPREAD MEASUREMENTS (LAST 50)</h3>
+      <div class="table-wrapper max-height-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Bitget Ask</th>
+              <th>Kraken Bid</th>
+              <th>Gross Spread</th>
+              <th>Est. Net Spread</th>
+            </tr>
+          </thead>
+          <tbody id="spreadHistoryTableBody">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Telegram Alerts Configuration -->
+    <section class="card alerts-card">
+      <h3>TELEGRAM ALERTS</h3>
+      <div class="alert-form-grid">
+        <div class="form-group">
+          <label for="alertChatId">Telegram Chat ID:</label>
+          <input type="text" id="alertChatId" placeholder="e.g. 123456789">
+        </div>
+        <div class="form-group">
+          <label for="alertDirection">Direction:</label>
+          <select id="alertDirection">
+            <option value="B2K">Bitget → Kraken</option>
+            <option value="K2B">Kraken → Bitget</option>
+            <option value="BOTH">Both Directions</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="alertMinSpread">Min Spread (%):</label>
+          <input type="number" id="alertMinSpread" step="0.1" value="1.0">
+        </div>
+        <div class="form-group">
+          <label for="alertCooldown">Cooldown (sec):</label>
+          <input type="number" id="alertCooldown" value="60">
+        </div>
+      </div>
+      <div class="alert-actions">
+        <button id="btnCreateAlert" class="btn-primary">CREATE ALERT</button>
+        <button id="btnTestAlert" class="btn-secondary">SEND TEST TELEGRAM ALERT</button>
+      </div>
+
+      <div class="active-alerts-list">
+        <h4>Active Alerts</h4>
+        <div id="alertsContainer" class="alerts-container">
+          <!-- Active alert items appear here -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>GAIB Spread Monitor &copy; 2026. Live Crypto Arbitrage Dashboard. Data updated via official public APIs.</p>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
