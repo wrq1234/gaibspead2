@@ -1,7 +1,4 @@
-/**
- * Serverless Telegram Proxy Endpoint
- * Deployable to Vercel Functions / Node.js Runtime
- */
+api/check-spread.js
 
 export default async function handler(req, res) {
   // CORS Headers
